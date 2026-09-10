@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Legal Learning - Recover Old App Data</title><link rel="icon" href="data:,">
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f5f7fb;color:#172033;margin:0}.top{background:#fff;border-bottom:1px solid #dbe1ea;padding:16px}.wrap{max-width:850px;margin:auto;padding:18px}.card{background:#fff;border:1px solid #dbe1ea;border-radius:18px;padding:20px;margin-bottom:14px}.btn{border:0;border-radius:12px;background:#234f8f;color:#fff;font-weight:800;padding:12px 16px;cursor:pointer}.btn.secondary{background:#fff;color:#234f8f;border:1px solid #234f8f}.step{display:grid;grid-template-columns:36px 1fr;gap:12px;margin:18px 0}.n{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#eef4ff;color:#234f8f;font-weight:900}.muted{color:#667085;font-size:13px;line-height:1.5}.good{color:#18794e;font-weight:700}.code{width:100%;min-height:180px;border:1px solid #dbe1ea;border-radius:12px;padding:10px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace;background:#f8fafc}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.warn{background:#fff9e8;border:1px solid #f2cf7d;border-radius:12px;padding:12px;font-size:13px;color:#694f00}
+</style></head>
+<body>
+<div class="top"><strong style="font-size:21px">Recover the Old Legal Learning / TRE Problem Set</strong><div class="muted">Use this only on the old page where the questions were previously stored.</div></div>
+<div class="wrap">
+<div class="card">
+<div class="step"><div class="n">1</div><div><strong>Copy the recovery command</strong><div class="muted">The command reads localStorage, sessionStorage, and IndexedDB for whatever page you run it on. It skips obvious authentication/token entries.</div><div class="toolbar" style="margin-top:10px"><button id="copy" class="btn">Copy Recovery Command</button><span id="copied" class="good"></span></div></div></div>
+<div class="step"><div class="n">2</div><div><strong>Open the OLD TRE / Legal Learning app</strong><div class="muted">It must be the old page/origin where the problem set existed—not the new benbeveridge83.github.io/Legal-Learning page.</div></div></div>
+<div class="step"><div class="n">3</div><div><strong>Open DevTools → Console, paste, and press Enter</strong><div class="muted">The browser will download a file named <b>legal-learning-origin-recovery.json</b>. Nothing in the old app is deleted or changed.</div></div></div>
+<div class="step"><div class="n">4</div><div><strong>Upload that JSON file into the ChatGPT conversation</strong><div class="muted">Once we have the export from the correct origin, the questions can be mapped into the new Supabase question tables.</div></div></div>
+<div class="warn">Chrome may block pasting into DevTools the first time. If Chrome displays its own warning, follow Chrome's displayed instruction to allow pasting, then paste the recovery command.</div>
+</div>
+<div class="card"><strong>Recovery command</strong><div class="muted" style="margin:5px 0 10px">You normally do not need to edit this. The Copy button above copies the same command.</div><textarea id="code" class="code" readonly></textarea></div>
+<div class="toolbar"><a href="./recover.html" class="btn secondary" style="text-decoration:none">Back to Deep Recovery</a><a href="./" class="btn secondary" style="text-decoration:none">Back to Legal Learning</a></div>
+</div>
+<script>
+const exporter = String.raw`(async()=>{
+ const out={exported_at:new Date().toISOString(),origin:location.origin,href:location.href,sources:[]};
+ const sensitive=n=>/auth.?token|access.?token|refresh.?token|password|secret|session/i.test(String(n||''));
+ const safe=(type,name,value,extra='')=>{if(!sensitive(name))out.sources.push({type,name,extra,value})};
+ try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(sensitive(k))continue;let v=localStorage.getItem(k);try{v=JSON.parse(v)}catch{}safe('localStorage',k,v)}}catch(e){safe('localStorage','SCAN ERROR',String(e))}
+ try{for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(sensitive(k))continue;let v=sessionStorage.getItem(k);try{v=JSON.parse(v)}catch{}safe('sessionStorage',k,v)}}catch(e){safe('sessionStorage','SCAN ERROR',String(e))}
+ const readStore=(dbName,storeName)=>new Promise(resolve=>{let r=indexedDB.open(dbName);r.onerror=()=>resolve({rows:[],error:String(r.error||'open failed')});r.onsuccess=()=>{const db=r.result,rows=[];try{const tx=db.transaction(storeName,'readonly'),st=tx.objectStore(storeName),c=st.openCursor();c.onsuccess=e=>{const cur=e.target.result;if(!cur){db.close();return resolve({rows})}rows.push(cur.value);if(rows.length>=10000){db.close();return resolve({rows,truncated:true})}cur.continue()};c.onerror=()=>{db.close();resolve({rows,error:String(c.error||'cursor failed')})}}catch(e){db.close();resolve({rows,error:String(e)})}}});
+ try{if(indexedDB.databases){const dbs=await indexedDB.databases();for(const d of dbs){if(!d.name||sensitive(d.name))continue;await new Promise(resolve=>{const r=indexedDB.open(d.name);r.onerror=()=>resolve();r.onsuccess=async()=>{const db=r.result,stores=Array.from(db.objectStoreNames);db.close();for(const s of stores){if(sensitive(s))continue;const x=await readStore(d.name,s);safe('IndexedDB',d.name+'/'+s,x.rows,x.error||(x.truncated?'first 10000 rows':''))}resolve()}})}}}catch(e){safe('IndexedDB','SCAN ERROR',String(e))}
+ const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='legal-learning-origin-recovery.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);alert('Recovery export complete. Upload legal-learning-origin-recovery.json to ChatGPT.');
+})()`;
+document.querySelector('#code').value=exporter;
+document.querySelector('#copy').onclick=async()=>{try{await navigator.clipboard.writeText(exporter);document.querySelector('#copied').textContent='Copied.'}catch(e){document.querySelector('#code').select();document.execCommand('copy');document.querySelector('#copied').textContent='Copied.'}};
+</script>
+</body></html>
